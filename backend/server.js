@@ -87,6 +87,6 @@ io.on("connection", (socket) => {
 });
 
 // ตั้งค่าให้ server ทำงานที่พอร์ต 3111
-server.listen(3111 || process.env.PORT, () => {
-  console.log("Server running on port 3111");
+server.listen(process.env.PORT || 3111, () => {
+  console.log("Server running on port", process.env.PORT || 3111);
 });
