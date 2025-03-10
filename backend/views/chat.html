@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.IO Chat</title>
+
+    <!-- MDBootstrap CSS -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome -->
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background-color: #f5f5f5;
+      }
+      .chat-container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .chat-header {
+        background: linear-gradient(40deg, #45cafc, #303f9f);
+        color: white;
+        border-radius: 10px 10px 0 0;
+        padding: 15px;
+        margin-bottom: 0;
+      }
+      .chat-area {
+        height: 450px;
+        overflow-y: auto;
+        background-color: white;
+        border: 1px solid #e0e0e0;
+        border-top: none;
+        padding: 1rem;
+      }
+      .message-item {
+        margin-bottom: 10px;
+        padding: 10px 15px;
+        border-radius: 15px;
+        position: relative;
+      }
+      .message-item:nth-child(odd) {
+        background-color: #f0f0f0;
+      }
+      .message-input {
+        border-radius: 25px;
+        padding-left: 15px;
+      }
+      .send-button {
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 45px; /* กำหนดความกว้างขั้นต่ำ */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        margin-left: 10px;
+        transition: all 0.2s ease;
+        border: none;
+      }
+
+      .send-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .send-button:active {
+        transform: scale(0.95);
+      }
+
+      /* ทำให้แน่ใจว่าไอคอนอยู่ตรงกลางพอดี */
+      .send-button i {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+      .room-card,
+      .users-card {
+        height: 100%;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .room-header,
+      .users-header {
+        background: linear-gradient(40deg, #ff6ec4, #7873f5);
+        color: white;
+        padding: 15px;
+        border-radius: 10px 10px 0 0;
+        margin-bottom: 0;
+      }
+      .users-header {
+        background: linear-gradient(40deg, #ffd86f, #fc6262);
+      }
+      .room-list-item {
+        transition: all 0.2s;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+      }
+      .room-list-item:hover {
+        background-color: #f5f5f5;
+      }
+      .room-list-item i {
+        margin-right: 10px;
+        color: #4f4f4f;
+      }
+      .room-list-item.active {
+        background-color: #e3f2fd;
+        font-weight: bold;
+      }
+      .user-list-item {
+        display: flex;
+        align-items: center;
+      }
+      .user-avatar {
+        width: 32px;
+        height: 32px;
+        background-color: #7873f5;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-weight: bold;
+      }
+      .room-form {
+        padding: 10px 15px;
+        background-color: #f9f9f9;
+        border-radius: 0 0 10px 10px;
+      }
+      .current-room-badge {
+        background-color: #7873f5;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        margin-bottom: 10px;
+        display: inline-block;
+      }
+      /* Responsive adjustments */
+      @media (max-width: 767px) {
+        .chat-area {
+          height: 350px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container chat-container mt-4 mb-5">
+      <h1 class="text-center mb-4">Realtime Chat</h1>
+
+      <div class="row g-3">
+        <!-- Room List -->
+        <div class="col-md-3">
+          <div class="card room-card">
+            <h5 class="room-header mb-0">Chat Rooms</h5>
+            <div class="p-0">
+              <ul id="rooms" class="list-group list-group-flush"></ul>
+            </div>
+            <div class="room-form">
+              <div class="input-group mb-2">
+                <input
+                  id="newRoom"
+                  class="form-control"
+                  placeholder="New room name"
+                />
+                <button class="btn btn-primary" onclick="createRoom()">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Window -->
+        <div class="col-md-6">
+          <div class="card">
+            <h5 class="chat-header mb-0">
+              <span id="currentRoomDisplay"
+                >Select or create a room to start chatting</span
+              >
+              <div id="roomBadge" class="current-room-badge d-none"></div>
+            </h5>
+            <ul id="messages" class="chat-area list-group list-unstyled"></ul>
+            <div class="card-footer bg-white">
+              <form id="form" action="" class="d-flex align-items-center">
+                <input
+                  id="input"
+                  class="form-control message-input me-2"
+                  autocomplete="off"
+                  placeholder="Type your message..."
+                  disabled
+                />
+                <button
+                  id="sendButton"
+                  class="btn btn-primary send-button"
+                  disabled
+                >
+                  <i class="fas fa-paper-plane"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- User List -->
+        <div class="col-md-3">
+          <div class="card users-card">
+            <h5 class="users-header mb-0">Users in Room</h5>
+            <div class="p-3" id="usersContainer">
+              <p class="text-muted text-center my-3">
+                Join a room to see participants
+              </p>
+              <ul id="users" class="list-group list-group-flush"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MDBootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      var socket = io();
+      var currentRoom = null;
+      var currentUser = null;
+
+      var roomList = document.getElementById("rooms");
+      var userList = document.getElementById("users");
+      var messages = document.getElementById("messages");
+      var form = document.getElementById("form");
+      var input = document.getElementById("input");
+      var sendButton = document.getElementById("sendButton");
+      var newRoomInput = document.getElementById("newRoom");
+      var currentRoomDisplay = document.getElementById("currentRoomDisplay");
+      var roomBadge = document.getElementById("roomBadge");
+      var usersContainer = document.getElementById("usersContainer");
+
+      // Update room list
+      socket.on("updateRoomList", function (rooms) {
+        roomList.innerHTML = rooms
+          .map(
+            (room) =>
+              `<li class="list-group-item room-list-item ${
+                room === currentRoom ? "active" : ""
+              }" onclick="joinRoom('${room}')">
+                <i class="fas fa-comments"></i> ${room}
+              </li>`
+          )
+          .join("");
+      });
+
+      // Update user list
+      socket.on("updateUserList", function (users) {
+        if (users.length === 0) {
+          usersContainer.innerHTML = `<p class="text-muted text-center my-3">No users in this room</p>`;
+        } else {
+          usersContainer.innerHTML = `<ul id="users" class="list-group list-group-flush">
+            ${users
+              .map(
+                (user) => `<li class="list-group-item user-list-item">
+                <div class="user-avatar">${user.charAt(0).toUpperCase()}</div>
+                ${user} ${
+                  user === currentUser
+                    ? '<span class="badge bg-primary ms-1">You</span>'
+                    : ""
+                }
+              </li>`
+              )
+              .join("")}
+          </ul>`;
+        }
+      });
+
+      // Receive and display messages - Using the original format
+      socket.on("message", function (msg) {
+        var item = document.createElement("li");
+        item.textContent = msg;
+        item.classList.add("message-item");
+        messages.appendChild(item);
+        messages.scrollTop = messages.scrollHeight;
+      });
+
+      // Create a new room
+      function createRoom() {
+        const room = newRoomInput.value.trim();
+        if (!room) {
+          alert("Please enter a room name");
+          return;
+        }
+
+        const user = prompt("Enter your name:") || "";
+        const trimmedUser = user.trim();
+
+        if (trimmedUser) {
+          socket.emit("joinRoom", { user: trimmedUser, room });
+          currentRoom = room;
+          currentUser = trimmedUser;
+          newRoomInput.value = "";
+
+          // Update UI
+          updateRoomDisplay();
+          enableChatInterface();
+        } else {
+          alert("Please provide your name!");
+        }
+      }
+
+      // Join existing room
+      function joinRoom(room) {
+        if (room === currentRoom) return;
+
+        const user = prompt("Enter your name:") || "";
+        const trimmedUser = user.trim();
+
+        if (trimmedUser) {
+          socket.emit("joinRoom", { user: trimmedUser, room });
+          currentRoom = room;
+          currentUser = trimmedUser;
+
+          // Update UI
+          updateRoomDisplay();
+          enableChatInterface();
+
+          // Clear previous messages
+          messages.innerHTML = "";
+        } else {
+          alert("Please provide your name!");
+        }
+      }
+
+      // Update room display
+      function updateRoomDisplay() {
+        currentRoomDisplay.textContent = `Chat Room`;
+        roomBadge.textContent = currentRoom;
+        roomBadge.classList.remove("d-none");
+      }
+
+      // Enable chat interface
+      function enableChatInterface() {
+        input.disabled = false;
+        sendButton.disabled = false;
+        input.focus();
+      }
+
+      // Send message
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        const message = input.value.trim();
+
+        if (message && currentRoom && currentUser) {
+          socket.emit("clientMessage", {
+            user: currentUser,
+            room: currentRoom,
+            message: message,
+          });
+          input.value = "";
+        }
+      });
+    </script>
+  </body>
+</html>
